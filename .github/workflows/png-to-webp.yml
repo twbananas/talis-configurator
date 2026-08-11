@@ -1,0 +1,43 @@
+name: Convert PNG to WebP
+
+# Runs when PNGs are pushed, or manually from the Actions tab (Run workflow).
+on:
+  push:
+    paths:
+      - "**.png"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install WebP encoder
+        run: sudo apt-get update && sudo apt-get install -y webp
+
+      - name: Convert every PNG to WebP
+        run: |
+          shopt -s globstar nullglob
+          changed=0
+          for f in **/*.png; do
+            out="${f%.png}.webp"
+            # -q 85 = good quality / small size. Use "-lossless" instead for exact pixels.
+            cwebp -q 85 "$f" -o "$out"
+            rm "$f"
+            echo "converted: $f -> $out"
+            changed=1
+          done
+          echo "changed=$changed" >> "$GITHUB_ENV"
+
+      - name: Commit the WebP files
+        if: env.changed == '1'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Convert PNG to WebP [skip ci]"
+          git push
